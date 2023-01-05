@@ -257,7 +257,7 @@ def evidence_filter(row):
                'rlimsp', 'trips', 'sparser', 'isi'}
     if set(row['source_counts']) < readers and row['evidence_count'] == 1:
         return False
-    elif set(row['source_counts']) ==  {'sparser'}:
+    elif set(row['source_counts']) == {'sparser'}:
         return False
     return True
 
@@ -411,3 +411,39 @@ def dump_ligand_receptor_omnipath_statements_csv():
     with open(csv_path, 'w') as fh:
         writer = csv.writer(fh, delimiter='\t')
         writer.writerows(rows)
+
+
+def merge_interactomes():
+    interactomes = ['enzyme_product', 'ligand_ion_channel', 'ligand_receptor']
+    rows = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
+    rows_hgnc = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
+    added = set()
+    idx = 0
+    for interactome in interactomes:
+        this_rows = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
+        this_rows_hgnc = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
+        this_idx = 0
+        df = pandas.read_csv(base_path.join('cpdb',
+                             name='%s_interactions.csv' % interactome))
+        df_hgnc = pandas.read_csv(base_path.join('cpdb',
+                                  name='%s_interactions_hgnc.csv' % interactome))
+        for row, row_hgnc in zip(df.itertuples(), df_hgnc.itertuples()):
+            if (row.partner_a, row.partner_b) not in added:
+                rows.append(['INDRA-%s' % idx, row.partner_a, row.partner_b,
+                             'INDRA'])
+                this_rows.append(['INDRA-%s' % this_idx, row.partner_a, row.partner_b,
+                                  'INDRA'])
+                rows_hgnc.append(['INDRA-%s' % idx, row_hgnc.partner_a,
+                                  row_hgnc.partner_b, 'INDRA'])
+                this_rows_hgnc.append(['INDRA-%s' % this_idx, row_hgnc.partner_a,
+                                      row_hgnc.partner_b, 'INDRA'])
+                added.add((row.partner_a, row.partner_b))
+                idx += 1
+                this_idx += 1
+        write_unicode_csv(base_path.join('cpdb', name='%s_unique_interactions.csv' % interactome), this_rows)
+        write_unicode_csv(base_path.join('cpdb', name='%s_unique_interactions_hgnc.csv' % interactome),
+                          this_rows_hgnc)
+
+    write_unicode_csv(base_path.join('cpdb', name='all_interactions.csv'), rows)
+    write_unicode_csv(base_path.join('cpdb', name='all_interactions_hgnc.csv'),
+                      rows_hgnc)
