@@ -1,4 +1,4 @@
-id_cp_interaction,partner_a,partner_b,source
+id_cp_interactions,partner_a,partner_b,source
 INDRA-0,P01023,P13569,INDRA
 INDRA-1,O00468,P55087,INDRA
 INDRA-2,O00468,O00555,INDRA

@@ -1,4 +1,4 @@
-id_cp_interaction,partner_a,partner_b,source
+id_cp_interactions,partner_a,partner_b,source
 INDRA-0,A2M,CFTR,INDRA
 INDRA-1,AGRN,AQP4,INDRA
 INDRA-2,AGRN,CACNA1A,INDRA
