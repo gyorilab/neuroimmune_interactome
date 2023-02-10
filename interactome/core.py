@@ -416,16 +416,27 @@ def dump_ligand_receptor_omnipath_statements_csv():
 def merge_interactomes():
     interactomes = ['enzyme_product', 'ligand_ion_channel', 'ligand_receptor']
     rows = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
-    rows_hgnc = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
+    rows_hgnc = [['id_cp_interactions', 'partner_a', 'partner_b', 'source',
+                  'interaction_type', 'note']]
     added = set()
     idx = 0
     for interactome in interactomes:
+        if interactome == 'enzyme_product':
+            note = ('Indirect interaction in which a product controlled by the '
+                    'enzyme binds a receptor or ion channel.')
+        elif interactome == 'ligand_ion_channel':
+            note = ('Interaction or regulation between a ligand and an '
+                    'ion channel.')
+        elif interactome == 'ligand_receptor':
+            note = ('Direct physical interaction between a ligand and a '
+                    'receptor.')
+
         this_rows = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
-        this_rows_hgnc = [['id_cp_interactions', 'partner_a', 'partner_b', 'source']]
+        this_rows_hgnc = [['id_cp_interactions', 'partner_a', 'partner_b', 'source', 'interaction_type', 'note']]
         this_idx = 0
         df = pandas.read_csv(base_path.join('cpdb',
                              name='%s_interactions.csv' % interactome))
-        df_hgnc = pandas.read_csv(base_path.join('cpdb',
+        df_hgnc = pandas.read_csv(base_path.join('intermediate',
                                   name='%s_interactions_hgnc.csv' % interactome))
         for row, row_hgnc in zip(df.itertuples(), df_hgnc.itertuples()):
             if (row.partner_a, row.partner_b) not in added:
@@ -434,15 +445,22 @@ def merge_interactomes():
                 this_rows.append(['INDRA-%s' % this_idx, row.partner_a, row.partner_b,
                                   'INDRA'])
                 rows_hgnc.append(['INDRA-%s' % idx, row_hgnc.partner_a,
-                                  row_hgnc.partner_b, 'INDRA'])
+                                  row_hgnc.partner_b, 'INDRA',
+                                  interactome, note])
                 this_rows_hgnc.append(['INDRA-%s' % this_idx, row_hgnc.partner_a,
-                                      row_hgnc.partner_b, 'INDRA'])
+                                      row_hgnc.partner_b, 'INDRA', interactome,
+                                      note])
                 added.add((row.partner_a, row.partner_b))
                 idx += 1
                 this_idx += 1
-        write_unicode_csv(base_path.join('cpdb', name='%s_unique_interactions.csv' % interactome), this_rows)
-        write_unicode_csv(base_path.join('cpdb', name='%s_unique_interactions_hgnc.csv' % interactome),
-                          this_rows_hgnc)
+        write_unicode_csv(
+            base_path.join('cpdb',
+                           name='%s_unique_interactions.csv' % interactome),
+            this_rows)
+        write_unicode_csv(
+            base_path.join('cpdb',
+                           name='%s_unique_interactions_hgnc.csv' % interactome),
+            this_rows_hgnc)
 
     write_unicode_csv(base_path.join('cpdb', name='all_interactions.csv'), rows)
     write_unicode_csv(base_path.join('cpdb', name='all_interactions_hgnc.csv'),
