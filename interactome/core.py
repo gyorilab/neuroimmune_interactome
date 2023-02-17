@@ -275,6 +275,11 @@ def get_enzyme_product_statements(cached=True):
         enzyme, product = row[0], row[2]
         chebi_name = bio_ontology.get_name('CHEBI', product)
         enzymes_by_product[chebi_name].add(enzyme)
+    # Write intermediate results into a JSON
+    with open(base_path.join('intermediate',
+                             name='enzymes_by_product.json'), 'w') as fh:
+        json.dump({k: sorted(v) for k, v in enzymes_by_product.items()}, fh,
+                  indent=1)
 
     products = set(enzymes_by_product) - {'ATP', 'ADP'}
 
@@ -325,6 +330,7 @@ def get_enzyme_product_statements(cached=True):
     interactions = sorted(set(zip(indra_df['agA_name'], indra_df['agB_name'])))
     idx = 0
     hgnc_rows = [('id_cp_interaction', 'partner_a', 'partner_b', 'source')]
+    triples = set()
     for product, target in interactions:
         target_hgnc = hgnc_client.get_hgnc_id(target)
         target_up = hgnc_client.get_uniprot_id(target_hgnc)
@@ -334,9 +340,13 @@ def get_enzyme_product_statements(cached=True):
             enz_up = hgnc_client.get_uniprot_id(enz_hgnc)
             if not enz_up or not target_up:
                 continue
+            triples.add((enz, product, target))
             rows.append(('INDRA-%s' % idx, enz_up, target_up, 'INDRA'))
             hgnc_rows.append(('INDRA-%s' % idx, enz, target, 'INDRA'))
             idx += 1
+    write_unicode_csv(base_path.join('intermediate',
+                                     name='enzyme_product_triples.csv'),
+                      sorted(triples))
     write_unicode_csv(base_path.join('cpdb',
                                      name='enzyme_product_interactions.csv'),
                       rows)
