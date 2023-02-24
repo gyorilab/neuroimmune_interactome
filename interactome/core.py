@@ -264,17 +264,29 @@ def evidence_filter(row):
 
 def get_enzyme_product_statements(cached=True):
     pc_sif_path = base_path.join('resources',
-                                 name='PathwayCommons12.Detailed.hgnc.sif.gz')
+                                 name='PathwayCommons12.Detailed.hgnc.txt.gz')
     enzymes = get_enzymes()
-    df = pandas.read_csv(pc_sif_path, sep='\t', header=None)
-    df = df[df[1] == 'controls-production-of']
-    df = df[df[0].isin(set(enzymes))]
+    df = pandas.read_csv(pc_sif_path, sep='\t')
+    df = df[df['INTERACTION_TYPE'] == 'controls-production-of']
+    df = df[df['PARTICIPANT_A'].isin(set(enzymes))]
 
     enzymes_by_product = defaultdict(set)
+    export_rows = []
     for _, row in df.iterrows():
         enzyme, product = row[0], row[2]
         chebi_name = bio_ontology.get_name('CHEBI', product)
+        export_rows.append(
+            [enzyme, product, chebi_name if chebi_name else '',
+             row[4] if not pandas.isna(row[4]) else '']
+        )
         enzymes_by_product[chebi_name].add(enzyme)
+    with open(base_path.join('intermediate',
+                             name='enzyme_product_relations.tsv'), 'w') as fh:
+        csv.writer(fh, delimiter='\t').writerows(
+            [['enzyme', 'product_id', 'product_name', 'pubmed_ids']] +
+            sorted(export_rows, key=lambda x: (x[0], x[2]))
+        )
+    assert False
     # Write intermediate results into a JSON
     with open(base_path.join('intermediate',
                              name='enzymes_by_product.json'), 'w') as fh:
@@ -398,6 +410,12 @@ def download_evidences(hashes):
 
 def dump_stmts_html(stmts, fname):
     from indra.assemblers.html import HtmlAssembler
+    for stmt in stmts:
+        stmt.evidence = [
+            ev for ev in stmt.evidence if ev.source_api != 'medscan'
+        ]
+        if not stmt.evidence:
+            assert False
     ha = HtmlAssembler(stmts, db_rest_url='https://db.indra.bio')
     ha.make_model(no_redundancy=True, grouping_level='statement')
     ha.save_model(fname)
