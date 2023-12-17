@@ -404,7 +404,11 @@ def download_statements(hashes, ev=100):
 
 def download_evidences(hashes):
     from indra_cogex.client.queries import get_evidences_for_stmt_hashes
+    import time
+    ts = time.time()
     evs_by_hash = get_evidences_for_stmt_hashes(hashes)
+    te = time.time()
+    print(te-ts)
     return evs_by_hash
 
 
@@ -493,3 +497,131 @@ def merge_interactomes():
     write_unicode_csv(base_path.join('cpdb', name='all_interactions.csv'), rows)
     write_unicode_csv(base_path.join('cpdb', name='all_interactions_hgnc.csv'),
                       rows_hgnc)
+
+
+def export_cellchat_human():
+    df = pandas.read_csv(base_path.join('cpdb', name='all_interactions_hgnc.csv'))
+    # First export the gene list
+    # Format
+    # "","Symbol","Name","EntrezGene.ID","Ensembl.Gene.ID","MGI.ID","Gene.group.name"
+    # "HGNC:5","A1BG","alpha-1-B glycoprotein",1,"ENSG00000121410","MGI:2152878","Immunoglobulin like domain containing"
+
+    all_hgnc_symbols = set(df.partner_a) | set(df.partner_b)
+    rows = [['', 'Symbol', 'Name', 'EntrezGene.ID', 'Ensembl.Gene.ID',
+             'MGI.ID', 'Gene.group.name']]
+    for gene in sorted(all_hgnc_symbols):
+        hgnc_id = hgnc_client.get_current_hgnc_id(gene)
+        assert hgnc_id
+        name = hgnc_client.get_hgnc_name(hgnc_id)
+        if name != gene:
+            print('HGNC name for %s is %s' % (gene, name))
+        ensembl_id = hgnc_client.get_ensembl_id(hgnc_id)
+        entrez_id = hgnc_client.get_entrez_id(hgnc_id)
+        mgi_id = hgnc_client.get_mouse_id(hgnc_id)
+        gene_group_name = 'Unknown'
+        row = ['HGNC:%s' % hgnc_id, name, name, entrez_id, ensembl_id,
+               'MGI:%s' % mgi_id, gene_group_name]
+        rows.append(row)
+    with open(base_path.join('cellchat', 'indra_human',
+                             name='gene_info.csv'), 'w') as fh:
+        csv.writer(fh).writerows(rows)
+
+    # Now export the interactions
+    # Format
+    # "","interaction_name","pathway_name","ligand","receptor","agonist","antagonist","co_A_receptor","co_I_receptor","evidence","annotation","interacti
+    # on_name_2"
+    # "TGFB1_TGFBR1_TGFBR2","TGFB1_TGFBR1_TGFBR2","TGFb","TGFB1","TGFbR1_R2","TGFb agonist","TGFb antagonist","","TGFb inhibition receptor","KEGG: hsa04
+    # 350","Secreted Signaling","TGFB1 - (TGFBR1+TGFBR2)"
+    rows = [['', 'interaction_name', 'pathway_name', 'ligand', 'receptor',
+             'agonist', 'antagonist', 'co_A_receptor', 'co_I_receptor',
+             'evidence', 'annotation', 'interaction_name_2']]
+    for row in df.itertuples():
+        hgnc_a = hgnc_client.get_current_hgnc_id(row.partner_a)
+        a_name = hgnc_client.get_hgnc_name(hgnc_a)
+        hgnc_b = hgnc_client.get_current_hgnc_id(row.partner_b)
+        b_name = hgnc_client.get_hgnc_name(hgnc_b)
+        annotation = 'Secreted Signaling'
+        interaction_name = '%s_%s' % (row.partner_a, row.partner_b)
+        row = ['', interaction_name, '', a_name, b_name, '', '', '', '',
+               'INDRA', annotation, interaction_name]
+        rows.append(row)
+    with open(base_path.join('cellchat', 'indra_human',
+                             name='interaction_input.csv'), 'w') as fh:
+        csv.writer(fh).writerows(rows)
+
+
+def export_cellchat_mouse():
+    df = pandas.read_csv(base_path.join('cpdb', name='all_interactions_hgnc.csv'))
+    # First export the gene list
+    # Format
+    # 1 "","Symbol","Name","EntrezGene.ID","Ensembl.Gene.ID","HomoloGene.ID","HGNC.ID"
+    # 2 "MGI:87853","a","nonagouti",50518,"ENSMUSG00000027596","1264","HGNC:745"
+
+    # "","Symbol","Name","EntrezGene.ID","Ensembl.Gene.ID","MGI.ID","Gene.group.name"
+    # "HGNC:5","A1BG","alpha-1-B glycoprotein",1,"ENSG00000121410","MGI:2152878","Immunoglobulin like domain containing"
+    from indra.databases import mgi_client
+    all_hgnc_symbols = set(df.partner_a) | set(df.partner_b)
+    rows = [['', 'Symbol', 'Name', 'EntrezGene.ID', 'Ensembl.Gene.ID', "HomoloGene.ID",
+             "HGNC.ID"]]
+    for gene in sorted(all_hgnc_symbols):
+        hgnc_id = hgnc_client.get_current_hgnc_id(gene)
+        assert hgnc_id
+        name = hgnc_client.get_hgnc_name(hgnc_id)
+        if name != gene:
+            print('HGNC name for %s is %s' % (gene, name))
+        mgi_id = hgnc_client.get_mouse_id(hgnc_id)
+        if not mgi_id:
+            continue
+        mgi_name = mgi_client.get_name_from_id(mgi_id)
+        ensembl_id = mgi_client.get_ensembl_id(mgi_id)
+        entrez_id = ''
+
+        row = ['MGI:%s' % mgi_id, mgi_name, mgi_name, entrez_id, ensembl_id, '',
+               'HGNC:%s' % hgnc_id]
+        rows.append(row)
+
+    with open(base_path.join('cellchat', 'indra_mouse',
+                             name='gene_info.csv'), 'w') as fh:
+        csv.writer(fh).writerows(rows)
+
+    # Now export the interactions
+    # Format
+    # 1 "","interaction_name","pathway_name","ligand","receptor","agonist","antagonist","co_A_receptor","co_I_receptor",
+    #    "evidence","annotation","interaction_name_2"
+    # 2 "TGFB1_TGFBR1_TGFBR2","TGFB1_TGFBR1_TGFBR2","TGFb","Tgfb1","TGFbR1_R2","TGFb agonist","TGFb antagonist","",
+    #    "TGFbinhibition receptor","KEGG: mmu04350","Secreted Signaling","Tgfb1 - (Tgfbr1+Tgfbr2)"
+
+
+    rows = [['', 'interaction_name', 'pathway_name', 'ligand', 'receptor',
+             'agonist', 'antagonist', 'co_A_receptor', 'co_I_receptor',
+             'evidence', 'annotation', 'interaction_name_2']]
+    seen = set()
+    skipped_count = 0
+    seen_count = 0
+    for row in df.itertuples():
+        hgnc_a = hgnc_client.get_current_hgnc_id(row.partner_a)
+        mgi_a = hgnc_client.get_mouse_id(hgnc_a)
+        a_name = mgi_client.get_name_from_id(mgi_a)
+        hgnc_b = hgnc_client.get_current_hgnc_id(row.partner_b)
+        mgi_b = hgnc_client.get_mouse_id(hgnc_b)
+        b_name = mgi_client.get_name_from_id(mgi_b)
+        if not mgi_a or not mgi_b:
+            skipped_count += 1
+            continue
+
+        if (mgi_a, mgi_b) in seen:
+            seen_count += 1
+            continue
+
+        seen.add((mgi_a, mgi_b))
+        annotation = 'Secreted Signaling'
+        evidence = 'INDRA'
+        interaction_name = '%s_%s' % (row.partner_a, row.partner_b)
+        row = [interaction_name, interaction_name, '', a_name, b_name, '', '', '', '',
+               evidence, annotation, interaction_name]
+        rows.append(row)
+    print('Skipped %d, seen %d' % (skipped_count, seen_count))
+
+    with open(base_path.join('cellchat', 'indra_mouse',
+                             name='interaction_input.csv'), 'w') as fh:
+        csv.writer(fh).writerows(rows)

@@ -71,6 +71,7 @@ if __name__ == '__main__':
     plt.figure()
     names = ['Incision', 'UV burn', 'Zymosan']
     colors = ['r', 'b', 'g']
+    assert False
     venn3([sig_ints[model] for model in models],
           set_labels=names,
           set_colors=colors)
